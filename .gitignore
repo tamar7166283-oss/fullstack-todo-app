@@ -1,0 +1,14 @@
+# Global .gitignore for Full-Stack Monorepo
+
+# 1. C# / .NET Build Artifacts (works for any subfolder)
+**/[Bb]in/
+**/[Oo]bj/
+
+# 2. Node / React Artifacts (works for any subfolder)
+**/node_modules/
+**/build/
+
+# 3. Development Environment Files
+.vscode/
+.vs/
+.env

@@ -8,6 +8,11 @@ using TodoApi; // וודא שה-Namespace תואם לפרויקט שלך
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ********** 🛠️ התיקון הקריטי לפריסה ב-Render 🛠️ **********
+// מכריח את Kestrel להאזין לכתובת 0.0.0.0 ופורט 80, כדי ש-Render יוכל לזהות את הפורט.
+builder.WebHost.UseUrls("http://0.0.0.0:80");
+// ************************************************************
+
 // 1. הגדרת CORS
 builder.Services.AddCors(options =>
 {
@@ -134,4 +139,8 @@ app.MapDelete("/items/{id}", async (PractycodedbContext db, int id) =>
     return Results.NoContent();
 }).RequireAuthorization();
 
-app.Run("http://localhost:5282");
+// ********** 🛠️ התיקון הקריטי לפריסה ב-Render 🛠️ **********
+// מחליף את app.Run("http://localhost:5282") ב-app.Run()
+// כדי לאפשר ל-Kestrel להשתמש בכתובת 0.0.0.0:80 שהוגדרה למעלה.
+app.Run(); 
+// ************************************************************

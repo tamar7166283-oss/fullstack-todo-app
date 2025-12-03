@@ -108,18 +108,18 @@ app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
 // --- Endpoints של משימות (מוגנים ע"י RequireAuthorization) ---
 
 app.MapGet("/items", async (PractycodedbContext db) =>
-    await db.NewTables.ToListAsync()).RequireAuthorization();
+    await db.Tasks.ToListAsync()).RequireAuthorization();
 
-app.MapPost("/items", async (PractycodedbContext db, NewTable newItem) =>
+app.MapPost("/items", async (PractycodedbContext db, TaskItem newItem) =>
 {
-    db.NewTables.Add(newItem);
+    db.Tasks.Add(newItem);
     await db.SaveChangesAsync();
     return Results.Created($"/items/{newItem.Id}", newItem);
 }).RequireAuthorization();
 
-app.MapPut("/items/{id}", async (PractycodedbContext db, int id, NewTable updatedItem) =>
+app.MapPut("/items/{id}", async (PractycodedbContext db, int id, TaskItem updatedItem) =>
 {
-    var item = await db.NewTables.FindAsync(id);
+    var item = await db.Tasks.FindAsync(id);
     if (item is null) return Results.NotFound();
 
     item.Name = updatedItem.Name;
@@ -131,10 +131,10 @@ app.MapPut("/items/{id}", async (PractycodedbContext db, int id, NewTable update
 
 app.MapDelete("/items/{id}", async (PractycodedbContext db, int id) =>
 {
-    var item = await db.NewTables.FindAsync(id);
+    var item = await db.Tasks.FindAsync(id);
     if (item is null) return Results.NotFound();
 
-    db.NewTables.Remove(item);
+    db.Tasks.Remove(item);
     await db.SaveChangesAsync();
     return Results.NoContent();
 }).RequireAuthorization();

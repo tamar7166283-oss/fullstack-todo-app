@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace TodoApi;
 
-public partial class NewTable
+public partial class TaskItem
 {
     public int Id { get; set; }
 

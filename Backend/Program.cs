@@ -58,16 +58,9 @@ if (string.IsNullOrEmpty(connectionString))
 
 // Log which configuration source is being used
 bool isLocal = connectionString.Contains("localhost") || connectionString.Contains("127.0.0.1");
-if (builder.Environment.IsDevelopment())
-{
-    Console.WriteLine("🏠 Development: ConnectionString from appsettings.Development.json");
-}
-else
-{
-    Console.WriteLine("☁️ Production: ConnectionString from Environment Variable or appsettings.json");
-}
 
-Console.WriteLine($"📍 Target Database: {(isLocal ? "LOCAL DATABASE 🏠" : "CLEVER CLOUD REMOTE ☁️")}");
+Console.WriteLine($"🚀 Application starting...");
+Console.WriteLine($"📍 Database: {(isLocal ? "LOCAL" : "CLEVER CLOUD")}");
 
 // 2. חיבור ל-DB
 builder.Services.AddDbContext<PractycodedbContext>(options =>
@@ -138,13 +131,6 @@ if (securityKey.Length < 32)
 
 var keyBytes = Encoding.ASCII.GetBytes(securityKey);
 
-// 🔍 DEBUG - הדפס את גודל המפתח
-Console.WriteLine("════════════════════════════════════════");
-Console.WriteLine("🔑 JWT_SECURITY_KEY validated:");
-Console.WriteLine($"   Length: {securityKey.Length} chars ({keyBytes.Length * 8} bits)");
-Console.WriteLine($"   Status: ✅ OK");
-Console.WriteLine("════════════════════════════════════════");
-
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -161,7 +147,6 @@ builder.Services.AddAuthentication(options =>
     };
 });
 builder.Services.AddAuthorization();
-// -------------------------------------
 
 var app = builder.Build();
 
@@ -183,102 +168,37 @@ app.MapGet("/check-db", async (PractycodedbContext db) =>
 {
     try
     {
-        Console.WriteLine("🔍 [CHECK-DB] Request received");
-        
-        // בדוק חיבור
         bool canConnect = await db.Database.CanConnectAsync();
-        Console.WriteLine($"   ✅ Can connect: {canConnect}");
-        
         if (!canConnect)
-        {
-            Console.WriteLine($"   ❌ Cannot connect to database!");
-            return Results.BadRequest(new 
-            { 
-                error = "Cannot connect to database",
-                status = "FAILED"
-            });
-        }
+            return Results.BadRequest(new { status = "FAILED", error = "Cannot connect" });
         
-        // בדוק טבלאות
         var usersCount = await db.Users.CountAsync();
         var tasksCount = await db.Tasks.CountAsync();
         
-        Console.WriteLine($"   ✅ Users table: {usersCount} records");
-        Console.WriteLine($"   ✅ Tasks table: {tasksCount} records");
-        
-        return Results.Ok(new 
-        { 
-            status = "SUCCESS",
-            connected = canConnect,
-            message = "Tables exist in database!",
-            usersCount = usersCount,
-            tasksCount = tasksCount,
-            database = "Clever Cloud MySQL"
-        });
+        return Results.Ok(new { status = "OK", usersCount, tasksCount });
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"   ❌ ERROR: {ex.GetType().Name}");
-        Console.WriteLine($"      Message: {ex.Message}");
-        if (ex.InnerException != null) 
-            Console.WriteLine($"      Inner: {ex.InnerException.Message}");
-        
-        return Results.BadRequest(new 
-        { 
-            status = "FAILED",
-            error = "Database check failed",
-            details = ex.Message,
-            innerException = ex.InnerException?.Message
-        });
+        return Results.BadRequest(new { status = "ERROR", error = ex.Message });
     }
 });
 
 // --- Endpoints להזדהות ---
 
-// הרשמה
 app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
 {
     try
     {
-        Console.WriteLine($"📝 [REGISTER] Request received - Name: {newUser.Name}");
-        
         if (string.IsNullOrEmpty(newUser.Name) || string.IsNullOrEmpty(newUser.Password))
-        {
-            Console.WriteLine($"   ❌ Validation failed: Missing credentials");
-            return Results.BadRequest("Name and password are required");
-        }
+            return Results.BadRequest(new { error = "Name and password are required" });
 
-        Console.WriteLine($"   ✅ Validation passed");
-        Console.WriteLine($"   🔍 Checking if user exists...");
-
-        // בדיקה אם המשתמש קיים
         var exists = await db.Users.AnyAsync(u => u.Name == newUser.Name);
         if (exists)
-        {
-            Console.WriteLine($"   ❌ User already exists");
-            return Results.BadRequest("User already exists");
-        }
+            return Results.BadRequest(new { error = "User already exists" });
 
-        Console.WriteLine($"   ✅ Creating new user...");
-
-        // הוסף משתמש חדש
         db.Users.Add(newUser);
-        Console.WriteLine($"   ⏳ Saving to database...");
-        
-        try
-        {
-            await db.SaveChangesAsync();
-            Console.WriteLine($"   ✅ User saved - Id: {newUser.Id}");
-        }
-        catch (Exception saveEx)
-        {
-            Console.WriteLine($"   ❌ SaveChangesAsync ERROR: {saveEx.Message}");
-            Console.WriteLine($"      InnerException: {saveEx.InnerException?.Message}");
-            throw;
-        }
-        Console.WriteLine($"   🔐 Generating JWT...");
+        await db.SaveChangesAsync();
 
-        // יצירת טוקן אחרי הרשמה מוצלחת - משתמש ב-keyBytes מ-Closure
         var tokenHandler = new JwtSecurityTokenHandler();
         var tokenDescriptor = new SecurityTokenDescriptor
         {
@@ -293,15 +213,10 @@ app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
         var token = tokenHandler.CreateToken(tokenDescriptor);
         var tokenString = tokenHandler.WriteToken(token);
 
-        Console.WriteLine($"   ✅ Registration successful! Token: {tokenString.Substring(0, 20)}...");
         return Results.Ok(new { token = tokenString, message = "Registration successful" });
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ [REGISTER] ERROR: {ex.GetType().Name}");
-        Console.WriteLine($"   Message: {ex.Message}");
-        if (ex.InnerException != null) Console.WriteLine($"   Inner: {ex.InnerException.Message}");
-        Console.WriteLine($"   Stack: {ex.StackTrace}");
         return Results.BadRequest(new { error = "Registration failed", details = ex.Message });
     }
 });
@@ -311,25 +226,14 @@ app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
 {
     try
     {
-        Console.WriteLine($"🔓 [LOGIN] Request - Name: {loginUser.Name}");
-        
         if (string.IsNullOrEmpty(loginUser.Name) || string.IsNullOrEmpty(loginUser.Password))
-        {
-            Console.WriteLine($"   ❌ Validation failed");
-            return Results.BadRequest("Name and password are required");
-        }
+            return Results.BadRequest(new { error = "Name and password are required" });
 
-        Console.WriteLine($"   ✅ Validation passed - Searching database...");
         var user = await db.Users.FirstOrDefaultAsync(u => u.Name == loginUser.Name && u.Password == loginUser.Password);
         
         if (user == null)
-        {
-            Console.WriteLine($"   ❌ User not found");
-            return Results.Unauthorized();
-        }
+            return Results.BadRequest(new { error = "Invalid username or password" });
 
-        Console.WriteLine($"   ✅ User found (Id:{user.Id}) - Generating JWT...");
-        // יצירת הטוקן
         var tokenHandler = new JwtSecurityTokenHandler();
         var tokenDescriptor = new SecurityTokenDescriptor
         {
@@ -344,13 +248,10 @@ app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
         var token = tokenHandler.CreateToken(tokenDescriptor);
         var tokenString = tokenHandler.WriteToken(token);
         
-        Console.WriteLine($"   ✅ Login successful!");
         return Results.Ok(new { token = tokenString, message = "Login successful" });
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ [LOGIN] ERROR: {ex.GetType().Name} - {ex.Message}");
-        if (ex.InnerException != null) Console.WriteLine($"   Inner: {ex.InnerException.Message}");
         return Results.BadRequest(new { error = "Login failed", details = ex.Message });
     }
 });
@@ -360,35 +261,15 @@ app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
 
 app.MapGet("/items", async (PractycodedbContext db) =>
 {
-    Console.WriteLine($"📋 [GET /items] Request");
-    try
-    {
-        var items = await db.Tasks.ToListAsync();
-        Console.WriteLine($"   ✅ Returned {items.Count} items");
-        return Results.Ok(items);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"   ❌ ERROR: {ex.Message}");
-        return Results.BadRequest(new { error = ex.Message });
-    }
+    var items = await db.Tasks.ToListAsync();
+    return Results.Ok(items);
 }).RequireAuthorization();
 
 app.MapPost("/items", async (PractycodedbContext db, TaskItem newItem) =>
 {
-    Console.WriteLine($"➕ [POST /items] Request - Name: {newItem.Name}");
-    try
-    {
-        db.Tasks.Add(newItem);
-        await db.SaveChangesAsync();
-        Console.WriteLine($"   ✅ Task created (Id:{newItem.Id})");
-        return Results.Created($"/items/{newItem.Id}", newItem);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"   ❌ ERROR: {ex.Message}");
-        return Results.BadRequest(new { error = ex.Message });
-    }
+    db.Tasks.Add(newItem);
+    await db.SaveChangesAsync();
+    return Results.Created($"/items/{newItem.Id}", newItem);
 }).RequireAuthorization();
 
 app.MapPut("/items/{id}", async (PractycodedbContext db, int id, TaskItem updatedItem) =>

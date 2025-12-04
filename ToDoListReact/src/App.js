@@ -6,11 +6,22 @@ function App() {
   const [todos, setTodos] = useState([]);
   
   // ניהול המצבים: 'login', 'register', 'tasks'
-  const [view, setView] = useState(localStorage.getItem('access_token') ? 'tasks' : 'login');
+  const [view, setView] = useState('login');
+  const [isLoading, setIsLoading] = useState(true);
   
   // State לטופס התחברות/הרשמה
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+
+  // בדיקה ב-mount האם קיים טוקן חוקי
+  useEffect(() => {
+    const savedToken = localStorage.getItem('access_token');
+    if (savedToken) {
+      setAccessToken(savedToken);
+      setView('tasks');
+    }
+    setIsLoading(false);
+  }, []);
 
   async function getTodos() {
     try {
@@ -23,10 +34,10 @@ function App() {
   }
 
   useEffect(() => {
-    if (view === 'tasks') {
+    if (view === 'tasks' && !isLoading) {
       getTodos();
     }
-  }, [view]);
+  }, [view, isLoading]);
 
   // פונקציות לוגין והרשמה
   async function handleLogin(e) {
@@ -67,6 +78,7 @@ async function handleRegister(e) {
   
   function handleLogout() {
       setAccessToken(null);
+      localStorage.removeItem('access_token');
       setView('login');
   }
 
@@ -89,6 +101,10 @@ async function handleRegister(e) {
   }
 
   // --- תצוגה ---
+  if (isLoading) {
+    return <div className="todoapp" style={{ padding: "20px" }}>טוען...</div>;
+  }
+
   if (view === 'login' || view === 'register') {
     return (
       <div className="todoapp" style={{ padding: "20px" }}>

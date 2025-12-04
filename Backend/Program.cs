@@ -78,6 +78,26 @@ if (string.IsNullOrEmpty(securityKey) || securityKey.Length < 16)
 
 var keyBytes = Encoding.ASCII.GetBytes(securityKey);
 
+// 🔍 DEBUG - הדפס את גודל המפתח
+Console.WriteLine("════════════════════════════════════════");
+Console.WriteLine("🔑 JWT_SECURITY_KEY DEBUG INFO:");
+Console.WriteLine($"   Length (chars): {securityKey.Length}");
+Console.WriteLine($"   Bytes: {keyBytes.Length}");
+Console.WriteLine($"   Bits: {keyBytes.Length * 8}");
+Console.WriteLine($"   First 10 chars: {securityKey.Substring(0, Math.Min(10, securityKey.Length))}...");
+
+if (keyBytes.Length < 32)
+{
+    Console.WriteLine($"   ❌ ERROR: Key is TOO SHORT!");
+    Console.WriteLine($"      Needs: at least 32 bytes (256 bits)");
+    Console.WriteLine($"      Has: {keyBytes.Length} bytes ({keyBytes.Length * 8} bits)");
+}
+else
+{
+    Console.WriteLine($"   ✅ OK: Key is valid ({keyBytes.Length} bytes)");
+}
+Console.WriteLine("════════════════════════════════════════");
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

@@ -127,16 +127,40 @@ app.UseAuthorization();
 // הרשמה
 app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
 {
-    if (string.IsNullOrEmpty(newUser.Username) || string.IsNullOrEmpty(newUser.Password))
-        return Results.BadRequest("Username and password are required");
+    try
+    {
+        if (string.IsNullOrEmpty(newUser.Username) || string.IsNullOrEmpty(newUser.Password))
+            return Results.BadRequest("Username and password are required");
 
-    // בדיקה אם המשתמש קיים
-    var exists = await db.Users.AnyAsync(u => u.Username == newUser.Username);
-    if (exists) return Results.BadRequest("User already exists");
+        // בדיקה אם המשתמש קיים
+        var exists = await db.Users.AnyAsync(u => u.Username == newUser.Username);
+        if (exists) return Results.BadRequest("User already exists");
 
-    db.Users.Add(newUser);
-    await db.SaveChangesAsync();
-    return Results.Ok("User registered successfully");
+        // הוסף משתמש חדש
+        db.Users.Add(newUser);
+        await db.SaveChangesAsync();
+
+        // יצירת טוקן אחרי הרשמה מוצלחת
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, newUser.Id.ToString()),
+                new Claim(ClaimTypes.Name, newUser.Username ?? "")
+            }),
+            Expires = DateTime.UtcNow.AddHours(1),
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(keyBytes), SecurityAlgorithms.HmacSha256Signature)
+        };
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        var tokenString = tokenHandler.WriteToken(token);
+
+        return Results.Ok(new { token = tokenString, message = "Registration successful" });
+    }
+    catch
+    {
+        return Results.StatusCode(500);
+    }
 });
 
 // התחברות

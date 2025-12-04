@@ -32,36 +32,36 @@ function App() {
   async function handleLogin(e) {
     e.preventDefault();
     try {
+      console.log('Logging in with:', { username, password });
       const response = await service.login(username, password);
+      console.log('Login response:', response);
       setAccessToken(response.token);
       setView('tasks');
-      setUsername(""); setPassword("");
+      setUsername(""); 
+      setPassword("");
     } catch (err) {
-      alert("Login failed. Check credentials.");
+      console.error('Login error:', err.response?.data || err.message);
+      alert("Login failed: " + (err.response?.data || "Server error"));
     }
   }
 
- // קוד מתוקן
+// קוד מתוקן
 async function handleRegister(e) {
     e.preventDefault();
     try {
-        // 1. נסה לבצע הרשמה (service.register)
-        await service.register(username, password);
+        console.log('Registering with:', { username, password });
+        // 1. נסה לבצע הרשמה
+        const registerResponse = await service.register(username, password);
+        console.log('Register response:', registerResponse);
         
-        // 2. אם ההרשמה הצליחה: בצע אוטומטית התחברות (Login)
-        // השתמש בנתוני המשתמש והסיסמה הנוכחיים
-        const response = await service.login(username, password);
-        
-        // 3. שמור את הטוקן, שנה View
-        setAccessToken(response.token);
+        // 2. אם הרשמה הצליחה, שמור את הטוקן ישירות מהתגובה
+        setAccessToken(registerResponse.token);
         setView('tasks');
         setUsername(""); 
         setPassword("");
-
     } catch (err) {
-        // אם משהו נכשל (הרשמה נכשלה, או הלוגין נכשל), הצג שגיאה מפורטת
-        const errorMessage = err.response?.data || "Check credentials/server is down.";
-        alert(`Registration/Login failed: ${errorMessage}`);
+        console.error('Registration error:', err.response?.data || err.message);
+        alert(`Registration failed: ${err.response?.data || "Server error"}`);
     }
 }
   

@@ -13,15 +13,18 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls("http://0.0.0.0:80");
 // ************************************************************
 
-// 1. הגדרת CORS
+// 1. הגדרת CORS (החדש - עם דומיין ספציפי)
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("FrontendCORS", policy =>
     {
-        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+        // *** 🎯 כתובת הקליינט הספציפית שלך! ***
+        policy.WithOrigins("https://to-do-list-frontend-t80a.onrender.com")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // חיוני למעבר טוקני JWT
     });
 });
-
 // 2. חיבור ל-DB
 builder.Services.AddDbContext<PractycodedbContext>(options =>
     options.UseMySql(builder.Configuration.GetConnectionString("practycodedb"),
@@ -32,7 +35,17 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // --- 4. הגדרת JWT Authentication ---
-var securityKey = "this_is_my_super_secret_key_for_jwt_signing_dont_share_it"; // במציאות: לשמור ב-appsettings.json
+
+// קריאת המפתח מהתצורה. ב-Render, זה יגיע ממשתנה הסביבה שהגדרת (למשל: JWT_SECURITY_KEY)
+var securityKey = builder.Configuration["JWT_SECURITY_KEY"];
+
+// בדיקה חיונית: ודא שהמפתח נמצא ואינו קצר מדי
+if (string.IsNullOrEmpty(securityKey) || securityKey.Length < 16) 
+{
+    // במקרה ש-Render לא טען את המפתח, ניתן להשתמש בגיבוי מקומי או לזרוק שגיאה
+    securityKey = "FALLBACK_KEY_AT_LEAST_32_CHARS_LONG_FOR_TESTING"; 
+}
+
 var keyBytes = Encoding.ASCII.GetBytes(securityKey);
 
 builder.Services.AddAuthentication(options =>
@@ -55,7 +68,7 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-app.UseCors("AllowAll");
+app.UseCors("FrontendCORS");
 app.UseSwagger();
 app.UseSwaggerUI(c => { c.RoutePrefix = "swagger"; c.DocumentTitle = "ToDo API Docs"; });
 

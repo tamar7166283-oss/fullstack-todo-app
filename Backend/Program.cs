@@ -140,7 +140,7 @@ app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
         db.Users.Add(newUser);
         await db.SaveChangesAsync();
 
-        // יצירת טוקן אחרי הרשמה מוצלחת
+        // יצירת טוקן אחרי הרשמה מוצלחת - משתמש ב-keyBytes מ-Closure
         var tokenHandler = new JwtSecurityTokenHandler();
         var tokenDescriptor = new SecurityTokenDescriptor
         {
@@ -157,8 +157,9 @@ app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
 
         return Results.Ok(new { token = tokenString, message = "Registration successful" });
     }
-    catch
+    catch (Exception ex)
     {
+        Console.WriteLine($"Register error: {ex.Message}");
         return Results.StatusCode(500);
     }
 });
@@ -193,8 +194,9 @@ app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
         
         return Results.Ok(new { token = tokenString, message = "Login successful" });
     }
-    catch
+    catch (Exception ex)
     {
+        Console.WriteLine($"Login error: {ex.Message}");
         return Results.StatusCode(500);
     }
 });

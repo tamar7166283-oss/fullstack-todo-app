@@ -263,9 +263,19 @@ app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
 
         // הוסף משתמש חדש
         db.Users.Add(newUser);
-        await db.SaveChangesAsync();
-
-        Console.WriteLine($"   ✅ User saved - Id: {newUser.Id}");
+        Console.WriteLine($"   ⏳ Saving to database...");
+        
+        try
+        {
+            await db.SaveChangesAsync();
+            Console.WriteLine($"   ✅ User saved - Id: {newUser.Id}");
+        }
+        catch (Exception saveEx)
+        {
+            Console.WriteLine($"   ❌ SaveChangesAsync ERROR: {saveEx.Message}");
+            Console.WriteLine($"      InnerException: {saveEx.InnerException?.Message}");
+            throw;
+        }
         Console.WriteLine($"   🔐 Generating JWT...");
 
         // יצירת טוקן אחרי הרשמה מוצלחת - משתמש ב-keyBytes מ-Closure

@@ -9,20 +9,25 @@ using TodoApi; // וודא שה-Namespace תואם לפרויקט שלך
 var builder = WebApplication.CreateBuilder(args);
 
 // ********** 🛠️ התיקון הקריטי לפריסה ב-Render 🛠️ **********
-// מכריח את Kestrel להאזין לכתובת 0.0.0.0 ופורט 80, כדי ש-Render יוכל לזהות את הפורט.
-builder.WebHost.UseUrls("http://0.0.0.0:80");
+// בפיתוח: השתמש בפורט 5282, ב-Render: השתמש ב-0.0.0.0:80
+if (builder.Environment.IsDevelopment())
+{
+    builder.WebHost.UseUrls("http://localhost:5282");
+}
+else
+{
+    builder.WebHost.UseUrls("http://0.0.0.0:80");
+}
 // ************************************************************
 
-// 1. הגדרת CORS (החדש - עם דומיין ספציפי)
+// 1. הגדרת CORS (חוקי וידידותיים - מרשה לכולם)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendCORS", policy =>
     {
-        // *** 🎯 כתובת הקליינט הספציפית שלך! ***
-        policy.WithOrigins("https://to-do-list-frontend-t80a.onrender.com")
+        policy.AllowAnyOrigin()
               .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials(); // חיוני למעבר טוקני JWT
+              .AllowAnyMethod(); // מרשה לכל המקורות
     });
 });
 // 2. חיבור ל-DB
@@ -32,7 +37,32 @@ builder.Services.AddDbContext<PractycodedbContext>(options =>
 
 // 3. הגדרת Swagger (עם תמיכה ב-JWT ב-UI - אופציונלי אך מומלץ)
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\""
+    });
+    
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] { }
+        }
+    });
+});
 
 // --- 4. הגדרת JWT Authentication ---
 
@@ -68,6 +98,22 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+// 🔨 CREATE DATABASE AND TABLES AUTOMATICALLY (for both local and Render)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<PractycodedbContext>();
+    try
+    {
+        // יצירת הטבלאות אם לא קיימות
+        db.Database.EnsureCreated();
+        Console.WriteLine("✅ Database and tables are ready!");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ Database warning: {ex.Message}");
+    }
+}
+
 app.UseCors("FrontendCORS");
 app.UseSwagger();
 app.UseSwaggerUI(c => { c.RoutePrefix = "swagger"; c.DocumentTitle = "ToDo API Docs"; });
@@ -96,25 +142,37 @@ app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
 // התחברות
 app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
 {
-    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == loginUser.Username && u.Password == loginUser.Password);
-    
-    if (user == null)
-        return Results.Unauthorized();
-
-    // יצירת הטוקן
-    var tokenHandler = new JwtSecurityTokenHandler();
-    var tokenDescriptor = new SecurityTokenDescriptor
+    try
     {
-        Subject = new ClaimsIdentity(new[]
+        if (string.IsNullOrEmpty(loginUser.Username) || string.IsNullOrEmpty(loginUser.Password))
+            return Results.BadRequest("Username and password are required");
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == loginUser.Username && u.Password == loginUser.Password);
+        
+        if (user == null)
+            return Results.Unauthorized();
+
+        // יצירת הטוקן
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var tokenDescriptor = new SecurityTokenDescriptor
         {
-            new Claim(ClaimTypes.Name, user.Id.ToString()),
-            new Claim("User", user.Username)
-        }),
-        Expires = DateTime.UtcNow.AddHours(1),
-        SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(keyBytes), SecurityAlgorithms.HmacSha256Signature)
-    };
-    var token = tokenHandler.CreateToken(tokenDescriptor);
-    return Results.Ok(new { token = tokenHandler.WriteToken(token) });
+            Subject = new ClaimsIdentity(new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Username ?? "")
+            }),
+            Expires = DateTime.UtcNow.AddHours(1),
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(keyBytes), SecurityAlgorithms.HmacSha256Signature)
+        };
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        var tokenString = tokenHandler.WriteToken(token);
+        
+        return Results.Ok(new { token = tokenString, message = "Login successful" });
+    }
+    catch
+    {
+        return Results.StatusCode(500);
+    }
 });
 
 

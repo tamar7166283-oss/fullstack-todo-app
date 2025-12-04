@@ -38,12 +38,27 @@ public partial class PractycodedbContext : DbContext
             entity.ToTable("tasks");
 
             entity.Property(e => e.Id)
-                .ValueGeneratedNever()
+                .ValueGeneratedOnAdd()
                 .HasColumnName("id");
             entity.Property(e => e.IsComplete).HasColumnName("isComplete");
             entity.Property(e => e.Name)
                 .HasMaxLength(100)
                 .HasColumnName("name");
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.ToTable("users");
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            entity.Property(e => e.Username)
+                .HasMaxLength(100)
+                .IsRequired()
+                .HasColumnName("username");
+            entity.Property(e => e.Password)
+                .HasMaxLength(255)
+                .IsRequired()
+                .HasColumnName("password");
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -185,20 +185,20 @@ app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
 {
     try
     {
-        Console.WriteLine($"📝 [REGISTER] Request received - Username: {newUser.Username}");
+        Console.WriteLine($"📝 [REGISTER] Request received - Name: {newUser.Name}");
         
-        if (string.IsNullOrEmpty(newUser.Username) || string.IsNullOrEmpty(newUser.Password))
+        if (string.IsNullOrEmpty(newUser.Name) || string.IsNullOrEmpty(newUser.Password))
         {
             Console.WriteLine($"   ❌ Validation failed: Missing credentials");
-            return Results.BadRequest("Username and password are required");
+            return Results.BadRequest("Name and password are required");
         }
 
         Console.WriteLine($"   ✅ Validation passed");
         Console.WriteLine($"   🔍 Checking if user exists...");
 
         // בדיקה אם המשתמש קיים
-        Console.WriteLine($"   🔍 SQL: SELECT COUNT(*) FROM users WHERE username='{newUser.Username}'");
-        var exists = await db.Users.AnyAsync(u => u.Username == newUser.Username);
+        Console.WriteLine($"   🔍 SQL: SELECT COUNT(*) FROM users WHERE Name='{newUser.Name}'");
+        var exists = await db.Users.AnyAsync(u => u.Name == newUser.Name);
         if (exists)
         {
             Console.WriteLine($"   ❌ User already exists");
@@ -221,7 +221,7 @@ app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
             Subject = new ClaimsIdentity(new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, newUser.Id.ToString()),
-                new Claim(ClaimTypes.Name, newUser.Username ?? "")
+                new Claim(ClaimTypes.Name, newUser.Name ?? "")
             }),
             Expires = DateTime.UtcNow.AddHours(1),
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(keyBytes), SecurityAlgorithms.HmacSha256Signature)
@@ -247,17 +247,17 @@ app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
 {
     try
     {
-        Console.WriteLine($"🔓 [LOGIN] Request - Username: {loginUser.Username}");
+        Console.WriteLine($"🔓 [LOGIN] Request - Name: {loginUser.Name}");
         
-        if (string.IsNullOrEmpty(loginUser.Username) || string.IsNullOrEmpty(loginUser.Password))
+        if (string.IsNullOrEmpty(loginUser.Name) || string.IsNullOrEmpty(loginUser.Password))
         {
             Console.WriteLine($"   ❌ Validation failed");
-            return Results.BadRequest("Username and password are required");
+            return Results.BadRequest("Name and password are required");
         }
 
         Console.WriteLine($"   ✅ Validation passed - Searching database...");
-        Console.WriteLine($"   🔍 SQL Query: SELECT * FROM users WHERE username='{loginUser.Username}' AND password='{loginUser.Password}'");
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == loginUser.Username && u.Password == loginUser.Password);
+        Console.WriteLine($"   🔍 SQL Query: SELECT * FROM users WHERE Name='{loginUser.Name}' AND Password='{loginUser.Password}'");
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Name == loginUser.Name && u.Password == loginUser.Password);
         
         if (user == null)
         {
@@ -273,7 +273,7 @@ app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
             Subject = new ClaimsIdentity(new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Username ?? "")
+                new Claim(ClaimTypes.Name, user.Name ?? "")
             }),
             Expires = DateTime.UtcNow.AddHours(1),
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(keyBytes), SecurityAlgorithms.HmacSha256Signature)

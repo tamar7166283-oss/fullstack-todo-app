@@ -51,14 +51,14 @@ public partial class PractycodedbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.ToTable("users");
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
-            entity.Property(e => e.Username)
+            entity.Property(e => e.Name)
                 .HasMaxLength(100)
                 .IsRequired()
-                .HasColumnName("username");
+                .HasColumnName("Name");
             entity.Property(e => e.Password)
-                .HasMaxLength(255)
+                .HasMaxLength(100)
                 .IsRequired()
-                .HasColumnName("password");
+                .HasColumnName("Password");
         });
 
         OnModelCreatingPartial(modelBuilder);

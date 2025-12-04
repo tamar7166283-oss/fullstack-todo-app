@@ -105,36 +105,36 @@ builder.Services.AddSwaggerGen(c =>
 
 // --- 4. הגדרת JWT Authentication ---
 
-// קריאת המפתח מהתצורה. ב-Render, זה יגיע ממשתנה הסביבה שהגדרת (למשל: JWT_SECURITY_KEY)
+// קריאת המפתח מהתצורה. בProduction (Render), זה יגיע ממשתנה הסביבה JWT_SECURITY_KEY
 var securityKey = builder.Configuration["JWT_SECURITY_KEY"];
 
-// בדיקה חיונית: ודא שהמפתח נמצא ואינו קצר מדי
-if (string.IsNullOrEmpty(securityKey) || securityKey.Length < 16) 
+// בדיקה: ודא שהמפתח תקין
+if (string.IsNullOrEmpty(securityKey)) 
 {
-    // במקרה ש-Render לא טען את המפתח, ניתן להשתמש בגיבוי מקומי או לזרוק שגיאה
-    securityKey = "FALLBACK_KEY_AT_LEAST_32_CHARS_LONG_FOR_TESTING"; 
+    throw new Exception(
+        "❌ FATAL: JWT_SECURITY_KEY is not configured!\n" +
+        "In Render Console, set Environment Variable:\n" +
+        "  Name: JWT_SECURITY_KEY\n" +
+        "  Value: your-secret-key-at-least-32-characters-long-for-production!"
+    );
+}
+
+if (securityKey.Length < 32)
+{
+    throw new Exception(
+        $"❌ FATAL: JWT_SECURITY_KEY is too short!\n" +
+        $"  Current length: {securityKey.Length} characters\n" +
+        $"  Required: at least 32 characters"
+    );
 }
 
 var keyBytes = Encoding.ASCII.GetBytes(securityKey);
 
 // 🔍 DEBUG - הדפס את גודל המפתח
 Console.WriteLine("════════════════════════════════════════");
-Console.WriteLine("🔑 JWT_SECURITY_KEY DEBUG INFO:");
-Console.WriteLine($"   Length (chars): {securityKey.Length}");
-Console.WriteLine($"   Bytes: {keyBytes.Length}");
-Console.WriteLine($"   Bits: {keyBytes.Length * 8}");
-Console.WriteLine($"   First 10 chars: {securityKey.Substring(0, Math.Min(10, securityKey.Length))}...");
-
-if (keyBytes.Length < 32)
-{
-    Console.WriteLine($"   ❌ ERROR: Key is TOO SHORT!");
-    Console.WriteLine($"      Needs: at least 32 bytes (256 bits)");
-    Console.WriteLine($"      Has: {keyBytes.Length} bytes ({keyBytes.Length * 8} bits)");
-}
-else
-{
-    Console.WriteLine($"   ✅ OK: Key is valid ({keyBytes.Length} bytes)");
-}
+Console.WriteLine("🔑 JWT_SECURITY_KEY validated:");
+Console.WriteLine($"   Length: {securityKey.Length} chars ({keyBytes.Length * 8} bits)");
+Console.WriteLine($"   Status: ✅ OK");
 Console.WriteLine("════════════════════════════════════════");
 
 builder.Services.AddAuthentication(options =>
@@ -177,16 +177,33 @@ app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
 {
     try
     {
+        Console.WriteLine($"📝 [REGISTER] Request received - Username: {newUser.Username}");
+        
         if (string.IsNullOrEmpty(newUser.Username) || string.IsNullOrEmpty(newUser.Password))
+        {
+            Console.WriteLine($"   ❌ Validation failed: Missing credentials");
             return Results.BadRequest("Username and password are required");
+        }
+
+        Console.WriteLine($"   ✅ Validation passed");
+        Console.WriteLine($"   🔍 Checking if user exists...");
 
         // בדיקה אם המשתמש קיים
         var exists = await db.Users.AnyAsync(u => u.Username == newUser.Username);
-        if (exists) return Results.BadRequest("User already exists");
+        if (exists)
+        {
+            Console.WriteLine($"   ❌ User already exists");
+            return Results.BadRequest("User already exists");
+        }
+
+        Console.WriteLine($"   ✅ Creating new user...");
 
         // הוסף משתמש חדש
         db.Users.Add(newUser);
         await db.SaveChangesAsync();
+
+        Console.WriteLine($"   ✅ User saved - Id: {newUser.Id}");
+        Console.WriteLine($"   🔐 Generating JWT...");
 
         // יצירת טוקן אחרי הרשמה מוצלחת - משתמש ב-keyBytes מ-Closure
         var tokenHandler = new JwtSecurityTokenHandler();
@@ -203,12 +220,16 @@ app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
         var token = tokenHandler.CreateToken(tokenDescriptor);
         var tokenString = tokenHandler.WriteToken(token);
 
+        Console.WriteLine($"   ✅ Registration successful! Token: {tokenString.Substring(0, 20)}...");
         return Results.Ok(new { token = tokenString, message = "Registration successful" });
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Register error: {ex.Message}");
-        return Results.StatusCode(500);
+        Console.WriteLine($"❌ [REGISTER] ERROR: {ex.GetType().Name}");
+        Console.WriteLine($"   Message: {ex.Message}");
+        if (ex.InnerException != null) Console.WriteLine($"   Inner: {ex.InnerException.Message}");
+        Console.WriteLine($"   Stack: {ex.StackTrace}");
+        return Results.BadRequest(new { error = "Registration failed", details = ex.Message });
     }
 });
 
@@ -217,14 +238,24 @@ app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
 {
     try
     {
+        Console.WriteLine($"🔓 [LOGIN] Request - Username: {loginUser.Username}");
+        
         if (string.IsNullOrEmpty(loginUser.Username) || string.IsNullOrEmpty(loginUser.Password))
+        {
+            Console.WriteLine($"   ❌ Validation failed");
             return Results.BadRequest("Username and password are required");
+        }
 
+        Console.WriteLine($"   ✅ Validation passed - Searching database...");
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == loginUser.Username && u.Password == loginUser.Password);
         
         if (user == null)
+        {
+            Console.WriteLine($"   ❌ User not found");
             return Results.Unauthorized();
+        }
 
+        Console.WriteLine($"   ✅ User found (Id:{user.Id}) - Generating JWT...");
         // יצירת הטוקן
         var tokenHandler = new JwtSecurityTokenHandler();
         var tokenDescriptor = new SecurityTokenDescriptor
@@ -240,12 +271,14 @@ app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
         var token = tokenHandler.CreateToken(tokenDescriptor);
         var tokenString = tokenHandler.WriteToken(token);
         
+        Console.WriteLine($"   ✅ Login successful!");
         return Results.Ok(new { token = tokenString, message = "Login successful" });
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Login error: {ex.Message}");
-        return Results.StatusCode(500);
+        Console.WriteLine($"❌ [LOGIN] ERROR: {ex.GetType().Name} - {ex.Message}");
+        if (ex.InnerException != null) Console.WriteLine($"   Inner: {ex.InnerException.Message}");
+        return Results.BadRequest(new { error = "Login failed", details = ex.Message });
     }
 });
 
@@ -253,13 +286,36 @@ app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
 // --- Endpoints של משימות (מוגנים ע"י RequireAuthorization) ---
 
 app.MapGet("/items", async (PractycodedbContext db) =>
-    await db.Tasks.ToListAsync()).RequireAuthorization();
+{
+    Console.WriteLine($"📋 [GET /items] Request");
+    try
+    {
+        var items = await db.Tasks.ToListAsync();
+        Console.WriteLine($"   ✅ Returned {items.Count} items");
+        return Results.Ok(items);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"   ❌ ERROR: {ex.Message}");
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}).RequireAuthorization();
 
 app.MapPost("/items", async (PractycodedbContext db, TaskItem newItem) =>
 {
-    db.Tasks.Add(newItem);
-    await db.SaveChangesAsync();
-    return Results.Created($"/items/{newItem.Id}", newItem);
+    Console.WriteLine($"➕ [POST /items] Request - Name: {newItem.Name}");
+    try
+    {
+        db.Tasks.Add(newItem);
+        await db.SaveChangesAsync();
+        Console.WriteLine($"   ✅ Task created (Id:{newItem.Id})");
+        return Results.Created($"/items/{newItem.Id}", newItem);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"   ❌ ERROR: {ex.Message}");
+        return Results.BadRequest(new { error = ex.Message });
+    }
 }).RequireAuthorization();
 
 app.MapPut("/items/{id}", async (PractycodedbContext db, int id, TaskItem updatedItem) =>

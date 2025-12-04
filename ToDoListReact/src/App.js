@@ -13,13 +13,8 @@ function App() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  // בדיקה ב-mount האם קיים טוקן חוקי
+  // בדיקה ב-mount - תמיד התחל מלוגין
   useEffect(() => {
-    const savedToken = localStorage.getItem('access_token');
-    if (savedToken) {
-      setAccessToken(savedToken);
-      setView('tasks');
-    }
     setIsLoading(false);
   }, []);
 
@@ -80,6 +75,8 @@ async function handleRegister(e) {
       setAccessToken(null);
       localStorage.removeItem('access_token');
       setView('login');
+      setUsername("");
+      setPassword("");
   }
 
   // --- פונקציות משימות (ללא שינוי מהותי) ---

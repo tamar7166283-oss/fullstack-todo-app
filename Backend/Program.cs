@@ -71,8 +71,16 @@ Console.WriteLine($"📍 Target Database: {(isLocal ? "LOCAL DATABASE 🏠" : "C
 
 // 2. חיבור ל-DB
 builder.Services.AddDbContext<PractycodedbContext>(options =>
+{
     options.UseMySql(connectionString,
-    ServerVersion.AutoDetect(connectionString)));
+        ServerVersion.AutoDetect(connectionString));
+    
+    // DEBUG: Log SQL queries
+    if (!builder.Environment.IsProduction())
+    {
+        options.LogTo(Console.WriteLine, LogLevel.Information);
+    }
+});
 
 // 3. הגדרת Swagger (עם תמיכה ב-JWT ב-UI - אופציונלי אך מומלץ)
 builder.Services.AddEndpointsApiExplorer();
@@ -189,6 +197,7 @@ app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
         Console.WriteLine($"   🔍 Checking if user exists...");
 
         // בדיקה אם המשתמש קיים
+        Console.WriteLine($"   🔍 SQL: SELECT COUNT(*) FROM users WHERE username='{newUser.Username}'");
         var exists = await db.Users.AnyAsync(u => u.Username == newUser.Username);
         if (exists)
         {
@@ -247,6 +256,7 @@ app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
         }
 
         Console.WriteLine($"   ✅ Validation passed - Searching database...");
+        Console.WriteLine($"   🔍 SQL Query: SELECT * FROM users WHERE username='{loginUser.Username}' AND password='{loginUser.Password}'");
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == loginUser.Username && u.Password == loginUser.Password);
         
         if (user == null)

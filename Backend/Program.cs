@@ -178,6 +178,61 @@ app.UseSwaggerUI(c => { c.RoutePrefix = "swagger"; c.DocumentTitle = "ToDo API D
 app.UseAuthentication(); 
 app.UseAuthorization();
 
+// --- Debug Endpoint: Check Database ---
+app.MapGet("/check-db", async (PractycodedbContext db) =>
+{
+    try
+    {
+        Console.WriteLine("🔍 [CHECK-DB] Request received");
+        
+        // בדוק חיבור
+        bool canConnect = await db.Database.CanConnectAsync();
+        Console.WriteLine($"   ✅ Can connect: {canConnect}");
+        
+        if (!canConnect)
+        {
+            Console.WriteLine($"   ❌ Cannot connect to database!");
+            return Results.BadRequest(new 
+            { 
+                error = "Cannot connect to database",
+                status = "FAILED"
+            });
+        }
+        
+        // בדוק טבלאות
+        var usersCount = await db.Users.CountAsync();
+        var tasksCount = await db.Tasks.CountAsync();
+        
+        Console.WriteLine($"   ✅ Users table: {usersCount} records");
+        Console.WriteLine($"   ✅ Tasks table: {tasksCount} records");
+        
+        return Results.Ok(new 
+        { 
+            status = "SUCCESS",
+            connected = canConnect,
+            message = "Tables exist in database!",
+            usersCount = usersCount,
+            tasksCount = tasksCount,
+            database = "Clever Cloud MySQL"
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"   ❌ ERROR: {ex.GetType().Name}");
+        Console.WriteLine($"      Message: {ex.Message}");
+        if (ex.InnerException != null) 
+            Console.WriteLine($"      Inner: {ex.InnerException.Message}");
+        
+        return Results.BadRequest(new 
+        { 
+            status = "FAILED",
+            error = "Database check failed",
+            details = ex.Message,
+            innerException = ex.InnerException?.Message
+        });
+    }
+});
+
 // --- Endpoints להזדהות ---
 
 // הרשמה
@@ -197,7 +252,6 @@ app.MapPost("/register", async (PractycodedbContext db, User newUser) =>
         Console.WriteLine($"   🔍 Checking if user exists...");
 
         // בדיקה אם המשתמש קיים
-        Console.WriteLine($"   🔍 SQL: SELECT COUNT(*) FROM users WHERE Name='{newUser.Name}'");
         var exists = await db.Users.AnyAsync(u => u.Name == newUser.Name);
         if (exists)
         {
@@ -256,7 +310,6 @@ app.MapPost("/login", async (PractycodedbContext db, User loginUser) =>
         }
 
         Console.WriteLine($"   ✅ Validation passed - Searching database...");
-        Console.WriteLine($"   🔍 SQL Query: SELECT * FROM users WHERE Name='{loginUser.Name}' AND Password='{loginUser.Password}'");
         var user = await db.Users.FirstOrDefaultAsync(u => u.Name == loginUser.Name && u.Password == loginUser.Password);
         
         if (user == null)

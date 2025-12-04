@@ -36,12 +36,12 @@ api.interceptors.response.use(
 export default {
   // פונקציות Auth חדשות
   register: async (username, password) => {
-    const result = await api.post('/register', { username, password });
+    const result = await api.post('/register', { name: username, password });
     return result.data;
   },
 
   login: async (username, password) => {
-    const result = await api.post('/login', { username, password });
+    const result = await api.post('/login', { name: username, password });
     return result.data; // { token: "..." }
   },
 

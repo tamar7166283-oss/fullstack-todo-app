@@ -1,5 +1,8 @@
-# Development settings (contains passwords)
+# Development settings (contains passwords and local DB credentials)
 appsettings.Development.json
+
+# ⚠️ IMPORTANT: appsettings.Production.json should NOT contain secrets!
+# Use environment variables in Clever Cloud instead (MYSQL_CONNECTION_STRING, JWT_SECURITY_KEY)
 
 # Build results
 bin/

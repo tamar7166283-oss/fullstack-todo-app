@@ -30,10 +30,49 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod(); // מרשה לכל המקורות
     });
 });
+// ========================================
+// 🔌 CONNECTION STRING - CONFIGURATION HIERARCHY
+// ========================================
+// .NET Core reads in this order (highest priority wins):
+// 1. Environment VariablesxxxxxxxctionStrings__practycodedb (CLEVER CLOUD!)
+// 2. appsettings.{Environment}.json (Development/Production)
+// 3. appsettings.json (base config)
+//
+// ⚠️ For Clever Cloud Production:
+// Set Environment Variable: ConnectionStrings__practycodedb
+// The __ (double underscore) tells .NET to map to ConnectionStrings:practycodedb
+
+string? connectionString = builder.Configuration.GetConnectionString("practycodedb");
+
+if (string.IsNullOrEmpty(connectionString))
+{
+    throw new Exception(
+        "❌ FATAL: No ConnectionString found for 'practycodedb'!\n\n" +
+        "Configure one of:\n" +
+        "  1. appsettings.json: { \"ConnectionStrings\": { \"practycodedb\": \"...\" } }\n" +
+        "  2. appsettings.Development.json (for local development)\n" +
+        "  3. Environment Variable: ConnectionStrings__practycodedb (for Clever Cloud)\n\n" +
+        "For Clever Cloud: Use pattern ConnectionStrings__practycodedb with MySQL URL"
+    );
+}
+
+// Log which configuration source is being used
+bool isLocal = connectionString.Contains("localhost") || connectionString.Contains("127.0.0.1");
+if (builder.Environment.IsDevelopment())
+{
+    Console.WriteLine("🏠 Development: ConnectionString from appsettings.Development.json");
+}
+else
+{
+    Console.WriteLine("☁️ Production: ConnectionString from Environment Variable or appsettings.json");
+}
+
+Console.WriteLine($"📍 Target Database: {(isLocal ? "LOCAL DATABASE 🏠" : "CLEVER CLOUD REMOTE ☁️")}");
+
 // 2. חיבור ל-DB
 builder.Services.AddDbContext<PractycodedbContext>(options =>
-    options.UseMySql(builder.Configuration.GetConnectionString("practycodedb"),
-    ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("practycodedb"))));
+    options.UseMySql(connectionString,
+    ServerVersion.AutoDetect(connectionString)));
 
 // 3. הגדרת Swagger (עם תמיכה ב-JWT ב-UI - אופציונלי אך מומלץ)
 builder.Services.AddEndpointsApiExplorer();
@@ -118,19 +157,31 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// 🔨 CREATE DATABASE AND TABLES AUTOMATICALLY (for both local and Render)
+// 🔨 CREATE DATABASE AND TABLES AUTOMATICALLY (for both local and Clever Cloud)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<PractycodedbContext>();
     try
     {
-        // יצירת הטבלאות אם לא קיימות
-        db.Database.EnsureCreated();
-        Console.WriteLine("✅ Database and tables are ready!");
+        Console.WriteLine("📊 Checking database connection...");
+        bool canConnect = db.Database.CanConnect();
+        
+        if (canConnect)
+        {
+            Console.WriteLine("✅ Database connection successful!");
+            db.Database.EnsureCreated();
+            Console.WriteLine("✅ Tables ensured!");
+        }
+        else
+        {
+            Console.WriteLine("❌ Cannot connect to database");
+            throw new Exception("Database connection failed");
+        }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"⚠️ Database warning: {ex.Message}");
+        Console.WriteLine($"❌ CRITICAL ERROR: {ex.Message}");
+        throw;
     }
 }
 

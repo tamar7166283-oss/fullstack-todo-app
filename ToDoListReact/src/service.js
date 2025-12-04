@@ -16,11 +16,9 @@ export const setAccessToken = (token) => {
   }
 };
 
-// שחזור טוקן בעת טעינת האפליקציה
-const savedToken = localStorage.getItem('access_token');
-if (savedToken) {
-  setAccessToken(savedToken);
-}
+// נמחק את הטוקן בעת טעינת האפליקציה כדי להכריח התחברות מחדש
+localStorage.removeItem('access_token');
+delete api.defaults.headers.common['Authorization'];
 
 // Interceptor לתפיסת שגיאות 401
 api.interceptors.response.use(

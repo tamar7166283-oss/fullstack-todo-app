@@ -157,33 +157,10 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// 🔨 CREATE DATABASE AND TABLES AUTOMATICALLY (for both local and Clever Cloud)
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<PractycodedbContext>();
-    try
-    {
-        Console.WriteLine("📊 Checking database connection...");
-        bool canConnect = db.Database.CanConnect();
-        
-        if (canConnect)
-        {
-            Console.WriteLine("✅ Database connection successful!");
-            db.Database.EnsureCreated();
-            Console.WriteLine("✅ Tables ensured!");
-        }
-        else
-        {
-            Console.WriteLine("❌ Cannot connect to database");
-            throw new Exception("Database connection failed");
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"❌ CRITICAL ERROR: {ex.Message}");
-        throw;
-    }
-}
+// ✅ Database connection is configured via ConnectionStrings__practycodedb
+// Tables already exist in Clever Cloud - no need to create them
+Console.WriteLine($"🚀 Application starting in {(builder.Environment.IsDevelopment() ? "Development" : "Production")} mode");
+Console.WriteLine($"📍 Connected to database via configuration");
 
 app.UseCors("FrontendCORS");
 app.UseSwagger();
